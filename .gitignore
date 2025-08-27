@@ -1,1 +1,11 @@
-"" 
+# Excel files
+*.xlsx
+*.xls
+*.xlsm
+*.xlsb
+
+# Other common file types to ignore
+*.tmp
+*.temp
+~$*
+
