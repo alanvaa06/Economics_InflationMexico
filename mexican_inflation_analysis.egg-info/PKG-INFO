@@ -1,0 +1,50 @@
+Metadata-Version: 2.4
+Name: mexican-inflation-analysis
+Version: 1.0.0
+Summary: A comprehensive analysis tool for Mexican inflation data using INEGI's API
+Author-email: Alan <alan@example.com>
+License: MIT
+Project-URL: Homepage, https://github.com/alanvaa06/Economics_InflationMexico
+Project-URL: Bug Reports, https://github.com/alanvaa06/Economics_InflationMexico/issues
+Project-URL: Source, https://github.com/alanvaa06/Economics_InflationMexico
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Financial and Insurance Industry
+Classifier: Intended Audience :: Science/Research
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Topic :: Scientific/Engineering :: Information Analysis
+Classifier: Topic :: Office/Business :: Financial
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: pandas>=1.3.0
+Requires-Dist: numpy>=1.21.0
+Requires-Dist: matplotlib>=3.4.0
+Requires-Dist: seaborn>=0.11.0
+Requires-Dist: requests>=2.25.0
+Requires-Dist: scipy>=1.7.0
+Requires-Dist: openpyxl>=3.0.0
+Provides-Extra: dev
+Requires-Dist: pytest>=6.0; extra == "dev"
+Requires-Dist: pytest-cov>=2.0; extra == "dev"
+Requires-Dist: black>=21.0; extra == "dev"
+Requires-Dist: flake8>=3.9; extra == "dev"
+Requires-Dist: mypy>=0.900; extra == "dev"
+Requires-Dist: jupyter>=1.0.0; extra == "dev"
+Requires-Dist: notebook>=6.0.0; extra == "dev"
+Provides-Extra: docs
+Requires-Dist: sphinx>=4.0; extra == "docs"
+Requires-Dist: sphinx-rtd-theme>=1.0; extra == "docs"
+Requires-Dist: myst-parser>=0.15; extra == "docs"
+Provides-Extra: test
+Requires-Dist: pytest>=6.0; extra == "test"
+Requires-Dist: pytest-cov>=2.0; extra == "test"
+Requires-Dist: pytest-mock>=3.0; extra == "test"
+
+# Economics_InflationMexico
+

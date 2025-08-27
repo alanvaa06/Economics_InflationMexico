@@ -4,6 +4,9 @@
 *.xlsm
 *.xlsb
 
+# CSV files
+*.csv
+
 # Other common file types to ignore
 *.tmp
 *.temp

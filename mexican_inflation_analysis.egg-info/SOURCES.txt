@@ -1,0 +1,8 @@
+README.md
+pyproject.toml
+mexican_inflation_analysis.egg-info/PKG-INFO
+mexican_inflation_analysis.egg-info/SOURCES.txt
+mexican_inflation_analysis.egg-info/dependency_links.txt
+mexican_inflation_analysis.egg-info/entry_points.txt
+mexican_inflation_analysis.egg-info/requires.txt
+mexican_inflation_analysis.egg-info/top_level.txt
