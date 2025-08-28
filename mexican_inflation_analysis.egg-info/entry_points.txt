@@ -1,2 +1,3 @@
 [console_scripts]
 inflation-analysis = InflationAnalysis:main
+inflation-dashboard = dashboard:main

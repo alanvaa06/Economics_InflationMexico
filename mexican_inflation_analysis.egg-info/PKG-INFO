@@ -29,6 +29,8 @@ Requires-Dist: seaborn>=0.11.0
 Requires-Dist: requests>=2.25.0
 Requires-Dist: scipy>=1.7.0
 Requires-Dist: openpyxl>=3.0.0
+Requires-Dist: streamlit>=1.28.0
+Requires-Dist: plotly>=5.15.0
 Provides-Extra: dev
 Requires-Dist: pytest>=6.0; extra == "dev"
 Requires-Dist: pytest-cov>=2.0; extra == "dev"
