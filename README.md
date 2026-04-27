@@ -24,6 +24,16 @@ Banco de Indicadores Económicos (BIE) de INEGI.
 - Suite de pruebas con `pytest` + `respx` (cliente, contribuciones, bug de
   cell 56, outliers, distribución, ponderadores).
 - CI en GitHub Actions y `pre-commit` con `ruff`, `nbstripout` y `gitleaks`.
+- **Banda objetivo Banxico (3% ± 1pp)** sombreada sobre la línea YoY del
+  INPC general y la subyacente en la pestaña Panorama.
+- **Núcleo alternativo**: media truncada y mediana ponderada de la sección
+  transversal de YoY (filtros que detectan ruido idiosincrático que la
+  subyacente oficial deja pasar). 5ta pestaña dedicada con selectbox de
+  universo y slider de % de recorte.
+- **Frecuencia quincenal**: el cliente y el dashboard manejan los formatos
+  ``YYYY/MM`` y ``YYYY/MM/Q1|Q2`` del BIE. Un radio en la barra lateral
+  alterna Panorama entre mensual y quincenal; las demás pestañas requieren
+  componentes con peso (sólo mensual).
 
 ## Inicio rápido
 
@@ -39,7 +49,8 @@ cp .env.example .env
 # obtenerlo en: https://www.inegi.org.mx/servicios/api_indicadores.html
 
 # Descargar datos del INEGI (opcional; el repo trae un snapshot 1969-2024-04)
-inflacion refresh
+inflacion refresh                       # mensual (471 series)
+inflacion refresh --frequency quincenal # quincenal (~10 agregados de cabecera)
 
 # Dashboard
 streamlit run app/streamlit_app.py
@@ -54,20 +65,22 @@ jupyter lab Inflation_Analysis.ipynb
 src/inflacion/
 ├── config.py            # carga INEGI_API_TOKEN desde .env (pydantic-settings)
 ├── inegi/
-│   ├── client.py        # cliente httpx + tenacity + redacción de tokens
-│   └── series.py        # catálogo de series del BIE
+│   ├── client.py            # cliente httpx + tenacity + redacción de tokens
+│   ├── series.py            # catálogo mensual (471 series, XLSX)
+│   └── series_quincenal.py  # catálogo quincenal (~10 IDs cabecera)
 ├── data/
-│   ├── ponderadores.py  # ponderadores INPC (rebase a 100 por rubro)
-│   └── pipeline.py      # orquestación: fetch → DataFrame ancho → parquet
+│   ├── ponderadores.py      # ponderadores INPC (rebase a 100 por rubro)
+│   └── pipeline.py          # refresh_inpc / refresh_inpc_quincenal
 ├── analytics/
-│   ├── contributions.py # MoM / YoY / incidencias
-│   ├── core_breakdown.py# Mercancías/Servicios, Alimentos/NoAlim, Edu/Viv/Otros
-│   ├── distributions.py # distribución por rangos de cambio YoY
-│   ├── base_effect.py   # outliers (z-score expansivo)
+│   ├── contributions.py     # MoM / YoY / incidencias
+│   ├── core_breakdown.py    # Mercancías/Servicios, Alimentos/NoAlim, Edu/Viv/Otros
+│   ├── alt_core.py          # media truncada + mediana ponderada (núcleo alt.)
+│   ├── distributions.py     # distribución por rangos de cambio YoY
+│   ├── base_effect.py       # outliers (z-score expansivo)
 │   └── zscore.py
 ├── viz/
-│   └── charts.py        # figuras Plotly compartidas con la app
-└── cli.py               # `inflacion refresh`
+│   └── charts.py            # incl. yoy_line_with_band (banda Banxico)
+└── cli.py                   # `inflacion refresh [--frequency …]`
 
 app/streamlit_app.py     # dashboard
 tests/                   # pruebas unitarias
@@ -77,7 +90,7 @@ notebooks/               # (opcional) cuadernos de exploración
 ## Pruebas
 
 ```bash
-python3 -m pytest -q     # 23 pruebas
+python3 -m pytest -q     # 40 pruebas
 python3 -m ruff check src tests app
 ```
 
@@ -101,6 +114,22 @@ Pruebas marcadas como `@pytest.mark.live` consultan el BIE real (requieren
   2024 (base 2ª quincena de julio 2018 = 100); mantenlos sincronizados.
 - `RelevantInflation.xlsx` / `FullInflation.xlsx`: snapshots históricos
   generados con `inflacion refresh`.
+
+### Frecuencia quincenal
+
+INEGI publica el INPC cada 10 y 25 de mes. El catálogo en
+`src/inflacion/inegi/series_quincenal.py` viene con **placeholders** para
+los IDs del BIE. Para activarlo:
+
+1. Abre el [Banco de Indicadores](https://www.inegi.org.mx/app/indicadores/)
+   filtrando por frecuencia *Quincenal*.
+2. Copia los IDs numéricos de los agregados (`IndiceGeneral`, `Subyacente`,
+   `NoSubyacente`, etc.) en `QUINCENAL_HEADLINE_IDS`.
+3. Corre `inflacion refresh --frequency quincenal`. El cliente acepta los
+   formatos ``YYYY/MM/Q1`` y ``YYYY/MM/Q2`` que devuelve el BIE.
+
+El parquet resultante (`data/RelevantInflation_Q.parquet`) lo consume el
+dashboard cuando se elige *Quincenal* en la barra lateral.
 
 ## Licencia
 
