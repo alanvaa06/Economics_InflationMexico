@@ -28,6 +28,9 @@ from inflacion.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Quincena 1: días 1–15 (cierre el día 15). Quincena 2: días 16–fin de mes.
+_QUINCENA_RE = re.compile(r"^Q?0?([12])$")
+
 
 class BIEError(RuntimeError):
     """Error genérico al consultar el BIE."""
@@ -153,7 +156,7 @@ def _parse_observations(payload: dict[str, Any]) -> pd.DataFrame:
         if not time_period:
             continue
         value = float("nan") if raw_value in ("", None) else float(raw_value)
-        rows.append((_to_month_end(time_period), value))
+        rows.append((_parse_time_period(time_period), value))
 
     if not rows:
         return pd.DataFrame(columns=["valor"])
@@ -163,8 +166,39 @@ def _parse_observations(payload: dict[str, Any]) -> pd.DataFrame:
     return df.sort_index()
 
 
+def _parse_time_period(time_period: str) -> date:
+    """Convierte el ``TIME_PERIOD`` del BIE a una fecha de cierre.
+
+    Formatos soportados:
+
+    - ``YYYY/MM``           → último día del mes (mensual).
+    - ``YYYY/MM/Q1`` o
+      ``YYYY/MM/1``         → quincena 1 → día 15.
+    - ``YYYY/MM/Q2`` o
+      ``YYYY/MM/2``         → quincena 2 → último día del mes.
+
+    Cualquier otro formato dispara :class:`BIEError` con el literal redactado
+    para evitar fugas accidentales.
+    """
+    parts = time_period.split("/")
+    if len(parts) < 2:
+        raise BIEError(f"TIME_PERIOD no reconocido: {_redact(time_period)!r}")
+    year, month = int(parts[0]), int(parts[1])
+    last_day = calendar.monthrange(year, month)[1]
+
+    if len(parts) == 2:
+        return date(year, month, last_day)
+
+    if len(parts) == 3:
+        match = _QUINCENA_RE.match(parts[2].strip())
+        if not match:
+            raise BIEError(f"TIME_PERIOD no reconocido: {_redact(time_period)!r}")
+        quincena = match.group(1)
+        return date(year, month, 15 if quincena == "1" else last_day)
+
+    raise BIEError(f"TIME_PERIOD no reconocido: {_redact(time_period)!r}")
+
+
 def _to_month_end(time_period: str) -> date:
-    """Convierte ``YYYY/MM`` (formato BIE) a fecha del último día del mes."""
-    year_str, month_str = time_period.split("/")[:2]
-    year, month = int(year_str), int(month_str)
-    return date(year, month, calendar.monthrange(year, month)[1])
+    """Wrapper de compatibilidad. Usar :func:`_parse_time_period` directamente."""
+    return _parse_time_period(time_period)
