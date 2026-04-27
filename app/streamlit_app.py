@@ -23,6 +23,8 @@ from inflacion.analytics import (
     bucket_distribution,
     contributions_yoy,
     incidencias,
+    trimmed_mean_yoy,
+    weighted_median_yoy,
 )
 from inflacion.config import settings
 from inflacion.data import load_ponderadores
@@ -109,8 +111,14 @@ since_iso = rango[0].strftime("%Y-%m")
 # Páginas
 # ---------------------------------------------------------------------------
 
-tab_overview, tab_contrib, tab_dist, tab_outliers = st.tabs(
-    ["📊 Panorama", "🧩 Contribuciones", "📈 Distribución", "⚠️ Atípicos"]
+tab_overview, tab_contrib, tab_dist, tab_outliers, tab_alt_core = st.tabs(
+    [
+        "📊 Panorama",
+        "🧩 Contribuciones",
+        "📈 Distribución",
+        "⚠️ Atípicos",
+        "🧪 Núcleo alternativo",
+    ]
 )
 
 
@@ -217,3 +225,59 @@ with tab_outliers:
     st.caption(
         f"Componentes marcados en la última fecha: {int(flags.iloc[-1].sum())} de {flags.shape[1]}"
     )
+
+
+# ----- Núcleo alternativo --------------------------------------------------
+with tab_alt_core:
+    st.subheader("Núcleo alternativo: media truncada y mediana ponderada")
+    st.caption(
+        "Filtros de sección transversal: ordenan los componentes por YoY y "
+        "descartan colas (truncada) o eligen el valor cuya masa acumulada cruza "
+        "0.5 (mediana). Útiles cuando un solo subgrupo ensucia la subyacente."
+    )
+
+    universos = list(ponderadores.weights_inpc.keys())
+    default_idx = (
+        universos.index("IndiceGeneral") if "IndiceGeneral" in universos else 0
+    )
+    universo = st.selectbox("Universo de componentes", universos, index=default_idx)
+    trim_pct = st.slider("Recorte por cola (%)", 0, 40, 10, step=5) / 100
+
+    weights_universe = ponderadores.weights_inpc[universo]
+    cols_universe = [c for c in inpc_filt.columns if c in weights_universe.index]
+
+    if not cols_universe or len(inpc_filt) < 13:
+        st.info("No hay suficientes datos para calcular núcleo alternativo.")
+    else:
+        sub_w = ponderadores.weights_inpc.get("Total_Subyacente")
+        sub_yoy = None
+        if sub_w is not None:
+            sub_cols = [c for c in inpc_filt.columns if c in sub_w.index]
+            if sub_cols:
+                w_sub = sub_w.loc[sub_cols] / sub_w.loc[sub_cols].sum()
+                sub_yoy = (
+                    inpc_filt[sub_cols]
+                    .pct_change(12, fill_method=None)
+                    .mul(w_sub, axis=1)
+                    .sum(axis=1, min_count=1)
+                    .rename("Subyacente oficial")
+                )
+
+        tm = trimmed_mean_yoy(
+            inpc_filt[cols_universe], weights_universe, trim=trim_pct, since=None
+        ).rename(f"Media truncada {int(trim_pct * 100)}%")
+        wm = weighted_median_yoy(
+            inpc_filt[cols_universe], weights_universe, since=None
+        ).rename("Mediana ponderada")
+
+        parts = [s for s in (sub_yoy, tm, wm) if s is not None]
+        df_alt = pd.concat(parts, axis=1).dropna(how="all")
+        st.plotly_chart(
+            yoy_line_with_band(df_alt, "Núcleo: oficial vs alternativos"),
+            width="stretch",
+        )
+
+        last_row = df_alt.dropna(how="all").iloc[-1]
+        cols_metrics = st.columns(len(last_row))
+        for col_widget, (name, val) in zip(cols_metrics, last_row.items(), strict=False):
+            col_widget.metric(name, f"{val * 100:.2f}%" if pd.notna(val) else "—")

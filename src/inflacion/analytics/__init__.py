@@ -1,4 +1,5 @@
 """Cálculos analíticos sobre el INPC."""
+from inflacion.analytics.alt_core import trimmed_mean_yoy, weighted_median_yoy
 from inflacion.analytics.base_effect import identify_outliers_expanding_window
 from inflacion.analytics.contributions import (
     contributions_mom,
@@ -23,4 +24,6 @@ __all__ = [
     "identify_outliers_expanding_window",
     "incidencias",
     "rolling_zscore",
+    "trimmed_mean_yoy",
+    "weighted_median_yoy",
 ]
