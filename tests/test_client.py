@@ -90,7 +90,9 @@ def test_500_retries_then_succeeds():
 
 
 def test_redact_uuid_in_logs():
-    msg = "fallo al pedir https://example/INDICATOR/1/.../BIE/2.0/REDACTED-INEGI-TOKEN-ROTATED?type=json"
+    """Cualquier UUID-like en mensajes (típicamente el token INEGI) debe redactarse."""
+    fake_uuid = "12345678-aaaa-bbbb-cccc-1234567890ab"
+    msg = f"fallo al pedir https://example/INDICATOR/1/.../BIE/2.0/{fake_uuid}?type=json"
     redacted = _redact(msg)
-    assert "4f988b8a" not in redacted
+    assert fake_uuid not in redacted
     assert "REDACTED" in redacted
