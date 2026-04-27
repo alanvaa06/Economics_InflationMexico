@@ -5,6 +5,7 @@ from inflacion.viz.charts import (
     distribution_area,
     incidencias_bar,
     percentiles_heatmap,
+    yoy_line_with_band,
 )
 
 __all__ = [
@@ -13,4 +14,5 @@ __all__ = [
     "distribution_area",
     "incidencias_bar",
     "percentiles_heatmap",
+    "yoy_line_with_band",
 ]

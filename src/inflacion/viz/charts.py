@@ -63,3 +63,77 @@ def incidencias_bar(df: pd.DataFrame, title: str) -> go.Figure:
     )
     fig.update_layout(template="plotly_white", xaxis_title="Contribución", yaxis_title="")
     return fig
+
+
+def yoy_line_with_band(
+    series: pd.Series | pd.DataFrame,
+    title: str,
+    *,
+    target: float = 0.03,
+    tolerance: float = 0.01,
+    band_label: str = "Objetivo Banxico (3% ± 1pp)",
+) -> go.Figure:
+    """Líneas YoY con la banda objetivo de Banxico sombreada.
+
+    Args:
+        series: tasa(s) YoY en escala decimal (e.g. 0.0432 para 4.32%).
+            Si es ``Series`` se traza una línea; si es ``DataFrame``,
+            una línea por columna.
+        title: título de la figura.
+        target: nivel central del objetivo (default 3%).
+        tolerance: amplitud de la banda en cada dirección (default ±1pp).
+        band_label: texto que aparece junto a la banda.
+    """
+    df = series.to_frame() if isinstance(series, pd.Series) else series.copy()
+    fig = go.Figure()
+
+    # Banda + línea central
+    band_lo = (target - tolerance) * 100
+    band_hi = (target + tolerance) * 100
+    fig.add_hrect(
+        y0=band_lo,
+        y1=band_hi,
+        fillcolor="rgba(45,204,205,0.12)",
+        line_width=0,
+        annotation_text=band_label,
+        annotation_position="top right",
+        annotation_font_size=11,
+    )
+    fig.add_hline(y=target * 100, line_dash="dash", line_color="#1973B8", line_width=1)
+
+    drawn = 0
+    for i, col in enumerate(df.columns):
+        s = (df[col] * 100).dropna()
+        if s.empty:
+            continue
+        fig.add_trace(
+            go.Scatter(
+                x=s.index,
+                y=s.values,
+                mode="lines",
+                name=str(col),
+                line={"color": BBVA_PALETTE[i % len(BBVA_PALETTE)], "width": 2},
+            )
+        )
+        drawn += 1
+
+    if drawn == 0:
+        fig.add_annotation(
+            text="Sin datos suficientes",
+            xref="paper",
+            yref="paper",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
+            font={"size": 14, "color": "#666"},
+        )
+
+    fig.update_layout(
+        title=title,
+        template="plotly_white",
+        xaxis_title="Fecha",
+        yaxis_title="Variación YoY (%)",
+        legend_title="Serie",
+        hovermode="x unified",
+    )
+    return fig

@@ -27,7 +27,12 @@ from inflacion.analytics import (
 from inflacion.config import settings
 from inflacion.data import load_ponderadores
 from inflacion.data.pipeline import load_local_inpc
-from inflacion.viz import contributions_bar, distribution_area, incidencias_bar
+from inflacion.viz import (
+    contributions_bar,
+    distribution_area,
+    incidencias_bar,
+    yoy_line_with_band,
+)
 
 st.set_page_config(
     page_title="Inflación México",
@@ -122,6 +127,27 @@ with tab_overview:
         col1.metric("Inflación YoY", f"{yoy * 100:.2f}%", delta=f"{(yoy - prev_yoy) * 100:+.2f} pp")
         col2.metric("Inflación MoM", f"{mom * 100:.2f}%")
         col3.metric("Última fecha", f"{headline.index[-1]:%b %Y}")
+
+    if "IndiceGeneral" in inpc_filt.columns and len(inpc_filt) >= 13:
+        yoy_general = inpc_filt["IndiceGeneral"].pct_change(12).rename("INPC general")
+        # Subyacente sintética: media ponderada de YoY de los componentes del rubro Total_Subyacente
+        sub_w = ponderadores.weights_inpc.get("Total_Subyacente")
+        if sub_w is not None:
+            sub_cols = [c for c in inpc_filt.columns if c in sub_w.index]
+            if sub_cols:
+                w = sub_w.loc[sub_cols] / sub_w.loc[sub_cols].sum()
+                sub_yoy = inpc_filt[sub_cols].pct_change(12).mul(w, axis=1).sum(
+                    axis=1, min_count=1
+                ).rename("Subyacente")
+                yoy_df = pd.concat([yoy_general, sub_yoy], axis=1)
+            else:
+                yoy_df = yoy_general.to_frame()
+        else:
+            yoy_df = yoy_general.to_frame()
+        st.plotly_chart(
+            yoy_line_with_band(yoy_df.dropna(how="all"), "Inflación YoY vs objetivo Banxico"),
+            width="stretch",
+        )
 
     st.markdown("##### Subyacente: Mercancías vs Servicios")
     core = breakdown_core_goods_services(inpc, ponderadores, since=since_iso)
