@@ -57,3 +57,6 @@ data/interim/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Claude Code local state (per-machine settings, transcripts, etc.)
+.claude/
