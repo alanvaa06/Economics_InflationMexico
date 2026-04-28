@@ -42,6 +42,12 @@ class MissingTokenError(BIEError):
 
 _TOKEN_RE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 
+# Marcador del error 400 que devuelve INEGI cuando el token está caducado o
+# es bogus. Es un string-match heurístico: BIE devuelve este mismo body para
+# tokens revocados Y para IDs realmente inexistentes. health_check sólo lo usa
+# como gate de auth-fail; ver tests/test_client_health.py.
+_AUTH_FAIL_MARKER = "No se encontraron resultados"
+
 
 def _redact(msg: str) -> str:
     """Sustituye cualquier UUID-like (formato del token INEGI) por ``REDACTED``."""
@@ -150,7 +156,7 @@ class BIEClient:
         if response.status_code == 200:
             return
         body = response.text
-        if response.status_code == 400 and "No se encontraron resultados" in body:
+        if response.status_code == 400 and _AUTH_FAIL_MARKER in body:
             raise MissingTokenError(
                 "INEGI rechazó el token (HTTP 400). Renueva en "
                 "https://www.inegi.org.mx/servicios/api_indicadores.html y actualiza .env."

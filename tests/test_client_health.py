@@ -51,3 +51,15 @@ def test_health_check_400_with_other_body_raises_bie_error():
     respx.get(url).mock(return_value=httpx.Response(400, text="Some other 400"))
     with BIEClient(token=TOKEN) as client, pytest.raises(BIEError):
         client.health_check()
+
+
+@respx.mock
+def test_health_check_network_error_raises_bie_error():
+    """Si el cliente no puede ni conectar, debe ser BIEError (no MissingTokenError)."""
+    url = f"{BASE}/INDICATOR/{HEALTH_ID}/es/0700/false/BIE/2.0/{TOKEN}?type=json"
+    respx.get(url).mock(side_effect=httpx.ConnectError("boom"))
+    with BIEClient(token=TOKEN) as client, pytest.raises(BIEError) as exc_info:
+        client.health_check()
+    # No debe ser MissingTokenError (que extiende BIEError)
+    assert not isinstance(exc_info.value, MissingTokenError)
+    assert "Error de red" in str(exc_info.value)
