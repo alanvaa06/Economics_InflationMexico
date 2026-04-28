@@ -27,7 +27,15 @@ def test_load_local_inpc_refreshes_when_cache_missing(monkeypatch, tmp_path):
     expected = _sample_monthly_df()
     called: dict[str, bool] = {"refresh": False}
 
+    class _NoOpClient:
+        def health_check(self) -> None:
+            return None
+
+        def close(self) -> None:
+            return None
+
     monkeypatch.setattr(type(pipeline.settings), "require_token", lambda self: "fake-token")
+    monkeypatch.setattr(pipeline, "BIEClient", lambda: _NoOpClient())
 
     def _fake_refresh(*, historic: bool, out_path, client=None):
         called["refresh"] = True

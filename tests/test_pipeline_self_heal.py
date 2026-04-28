@@ -12,6 +12,17 @@ def _sample_monthly_df() -> pd.DataFrame:
     return pd.DataFrame({"IndiceGeneral": [132.1, 132.8, 133.4]}, index=idx)
 
 
+class _NoOpClient:
+    """Stub que reemplaza ``BIEClient`` cuando los tests sólo prueban
+    el flujo de auto-heal (sin tocar HTTP)."""
+
+    def health_check(self) -> None:
+        return None
+
+    def close(self) -> None:
+        return None
+
+
 def test_load_local_inpc_self_heals_zero_rows(monkeypatch, tmp_path):
     target = tmp_path / "RelevantInflation.parquet"
     # Persistir DF 0×0
@@ -24,6 +35,7 @@ def test_load_local_inpc_self_heals_zero_rows(monkeypatch, tmp_path):
         return refreshed
 
     monkeypatch.setattr(type(pipeline.settings), "require_token", lambda self: "fake")
+    monkeypatch.setattr(pipeline, "BIEClient", lambda: _NoOpClient())
     monkeypatch.setattr(pipeline, "refresh_inpc", _fake_refresh)
 
     loaded = pipeline.load_local_inpc(path=target)
@@ -37,6 +49,7 @@ def test_load_local_inpc_self_heals_zero_columns(monkeypatch, tmp_path):
 
     refreshed = _sample_monthly_df()
     monkeypatch.setattr(type(pipeline.settings), "require_token", lambda self: "fake")
+    monkeypatch.setattr(pipeline, "BIEClient", lambda: _NoOpClient())
     monkeypatch.setattr(
         pipeline, "refresh_inpc",
         lambda *, historic, out_path, client=None: (refreshed.to_parquet(out_path), refreshed)[1],
@@ -52,6 +65,7 @@ def test_load_local_inpc_quincenal_self_heals_empty(monkeypatch, tmp_path):
 
     refreshed = _sample_monthly_df()  # estructura idéntica para test
     monkeypatch.setattr(type(pipeline.settings), "require_token", lambda self: "fake")
+    monkeypatch.setattr(pipeline, "BIEClient", lambda: _NoOpClient())
     monkeypatch.setattr(
         pipeline, "refresh_inpc_quincenal",
         lambda *, historic, out_path, client=None: (refreshed.to_parquet(out_path), refreshed)[1],

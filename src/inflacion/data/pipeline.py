@@ -76,7 +76,15 @@ def load_local_inpc(path: Path | None = None) -> pd.DataFrame:
         ) from exc
 
     logger.info("INPC local no encontrado; descargando desde INEGI BIE a %s", target)
-    refresh_inpc(historic=True, out_path=target)
+    # Sondeo de salud antes de bombardear con ~471 series: si el token está
+    # rechazado, MissingTokenError sube y la app puede mostrar onboarding sin
+    # esperar a que cada serie individual falle con HTTP 400.
+    bie = BIEClient()
+    try:
+        bie.health_check()
+        refresh_inpc(historic=True, out_path=target, client=bie)
+    finally:
+        bie.close()
     if target.exists():
         df = pd.read_parquet(target)
         df.index = pd.to_datetime(df.index)
@@ -222,7 +230,14 @@ def load_local_inpc_quincenal(path: Path | None = None) -> pd.DataFrame:
         ) from exc
 
     logger.info("INPC quincenal local no encontrado; descargando desde INEGI BIE a %s", target)
-    refresh_inpc_quincenal(historic=True, out_path=target)
+    # Mismo sondeo de salud que load_local_inpc: para que un token caducado
+    # no dispare 10+ probes inútiles antes de fallar.
+    bie = BIEClient()
+    try:
+        bie.health_check()
+        refresh_inpc_quincenal(historic=True, out_path=target, client=bie)
+    finally:
+        bie.close()
     if target.exists():
         df = pd.read_parquet(target)
         df.index = pd.to_datetime(df.index)
