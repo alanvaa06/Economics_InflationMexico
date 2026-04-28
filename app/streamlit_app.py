@@ -31,7 +31,6 @@ from inflacion.data.pipeline import (
     load_local_inpc,
     load_local_inpc_quincenal,
     refresh_inpc,
-    refresh_inpc_quincenal,
 )
 from inflacion.viz import (
     contributions_bar,
@@ -64,13 +63,44 @@ def _load_quincenal() -> pd.DataFrame:
     return load_local_inpc_quincenal()
 
 
+def _render_onboarding(reason: str, exc: Exception | None = None) -> None:
+    """Renderiza la página de bienvenida cuando no hay datos para mostrar."""
+    st.title("📈 Inflación México — primera ejecución")
+    st.markdown(
+        """
+        Esta app analiza el INPC publicado por **INEGI** (Banco de Indicadores
+        Económicos). Para descargar datos, necesitas un token gratuito.
+
+        **Pasos:**
+        1. Solicita un token en [INEGI API Indicadores](https://www.inegi.org.mx/servicios/api_indicadores.html).
+        2. Copia `.env.example` a `.env` y pega tu token en `INEGI_API_TOKEN`.
+        3. Recarga esta página.
+        """
+    )
+    st.warning(reason)
+    if exc is not None:
+        with st.expander("Detalles técnicos"):
+            st.exception(exc)
+
+
+from inflacion.inegi.client import MissingTokenError  # noqa: E402
+
 try:
     inpc, ponderadores = _load_monthly()
-except FileNotFoundError as exc:
-    st.error(
-        "No se pudo cargar el INPC mensual desde cache local ni descargarlo de INEGI. "
-        "Verifica `.env` con `INEGI_API_TOKEN` y vuelve a intentar."
+except MissingTokenError as exc:
+    _render_onboarding(
+        "Tu `INEGI_API_TOKEN` actual fue rechazado por INEGI (HTTP 400). "
+        "Probablemente fue rotado o caducó. Renuévalo y reinicia.",
+        exc,
     )
+    st.stop()
+except FileNotFoundError as exc:
+    _render_onboarding(
+        "No se encontró cache local del INPC y no hay token configurado.", exc,
+    )
+    st.stop()
+except Exception as exc:
+    st.error("Falla inesperada al cargar el INPC mensual.")
     st.exception(exc)
     st.stop()
 
@@ -137,11 +167,32 @@ with st.sidebar:
         except RuntimeError as exc:
             st.error(str(exc))
         else:
-            with st.status("Descargando mensual desde INEGI…"):
+            from inflacion.inegi.client import BIEClient, MissingTokenError
+
+            progress = st.progress(0, text="Descargando 0/?")
+            status_box = st.empty()
+
+            def _cb(done: int, total: int, name: str) -> None:
+                progress.progress(done / total, text=f"Descargando {done}/{total}: {name[:40]}")
+
+            try:
+                client = BIEClient()
+                try:
+                    client.health_check()
+                except MissingTokenError as exc:
+                    st.error(str(exc))
+                    client.close()
+                    st.stop()
                 refresh_inpc(
                     historic=True,
                     out_path=settings.data_dir / "RelevantInflation.parquet",
+                    client=client,
+                    progress_cb=_cb,
                 )
+                status_box.success("Descarga mensual completada.")
+            except Exception as exc:
+                status_box.error(f"Falla al descargar: {exc}")
+                st.stop()
             st.cache_data.clear()
             st.rerun()
     if col_b2.button("Descargar desde INEGI (quincenal)"):
@@ -150,16 +201,44 @@ with st.sidebar:
         except RuntimeError as exc:
             st.error(str(exc))
         else:
+            from inflacion.data.pipeline import refresh_inpc_quincenal_with_discovery
+            from inflacion.inegi.client import BIEClient, MissingTokenError
+
+            disc_progress = st.progress(0, text="Resolviendo IDs quincenales…")
+            fetch_progress = st.progress(0, text="Esperando descubrimiento…")
+            status_box = st.empty()
+
+            def _disc_cb(done: int, total: int, name: str) -> None:
+                disc_progress.progress(done / total, text=f"Resolviendo {done}/{total}: {name}")
+
+            def _fetch_cb(done: int, total: int, name: str) -> None:
+                fetch_progress.progress(
+                    done / total, text=f"Descargando {done}/{total}: {name}"
+                )
+
             try:
-                with st.status("Descargando quincenal desde INEGI…"):
-                    refresh_inpc_quincenal(
-                        historic=True,
-                        out_path=settings.data_dir / "RelevantInflation_Q.parquet",
-                    )
-                st.cache_data.clear()
-                st.rerun()
-            except RuntimeError as exc:
-                st.error(str(exc))
+                client = BIEClient()
+                try:
+                    client.health_check()
+                except MissingTokenError as exc:
+                    st.error(str(exc))
+                    client.close()
+                    st.stop()
+                df = refresh_inpc_quincenal_with_discovery(
+                    client=client,
+                    out_path=settings.data_dir / "RelevantInflation_Q.parquet",
+                    historic=True,
+                    discovery_progress_cb=_disc_cb,
+                    fetch_progress_cb=_fetch_cb,
+                )
+                status_box.success(
+                    f"Quincenal: {df.shape[1]} de 10 conceptos cabecera disponibles."
+                )
+            except Exception as exc:
+                status_box.error(f"Falla al descargar quincenal: {exc}")
+                st.stop()
+            st.cache_data.clear()
+            st.rerun()
 
 if inpc_active.empty:
     st.info(
