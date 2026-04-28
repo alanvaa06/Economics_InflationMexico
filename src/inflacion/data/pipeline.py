@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
 
 import pandas as pd
@@ -19,6 +20,7 @@ def refresh_inpc(
     historic: bool = True,
     out_path: Path | None = None,
     client: BIEClient | None = None,
+    progress_cb: Callable[[int, int, str], None] | None = None,
 ) -> pd.DataFrame:
     """Descarga todas las series del catálogo y devuelve un DataFrame ancho.
 
@@ -26,12 +28,14 @@ def refresh_inpc(
         historic: ``True`` trae la serie completa; ``False`` solo lo más reciente.
         out_path: si se indica, guarda en parquet (recomendado) o xlsx.
         client: cliente a reutilizar (útil para tests o múltiples llamadas).
+        progress_cb: función opcional ``(done, total, name) -> None`` llamada
+            por cada serie descargada; útil para barras de progreso en UI.
     """
     catalog = load_series_catalog()
     owns_client = client is None
     bie = client or BIEClient()
     try:
-        wide = bie.fetch_many(catalog.tolist(), historic=historic)
+        wide = bie.fetch_many(catalog.tolist(), historic=historic, progress_cb=progress_cb)
     finally:
         if owns_client:
             bie.close()
@@ -85,6 +89,7 @@ def refresh_inpc_quincenal(
     historic: bool = True,
     out_path: Path | None = None,
     client: BIEClient | None = None,
+    progress_cb: Callable[[int, int, str], None] | None = None,
 ) -> pd.DataFrame:
     """Descarga las series quincenales (encabezados) del INPC desde INEGI BIE.
 
@@ -93,6 +98,8 @@ def refresh_inpc_quincenal(
         out_path: si se indica, guarda en parquet (recomendado) o xlsx. Por
             defecto: ``data/RelevantInflation_Q.parquet``.
         client: cliente a reutilizar (útil para tests o múltiples llamadas).
+        progress_cb: función opcional ``(done, total, name) -> None`` llamada
+            por cada serie descargada; útil para barras de progreso en UI.
     """
     catalog = load_quincenal_catalog()
     if catalog.empty:
@@ -103,7 +110,7 @@ def refresh_inpc_quincenal(
     owns_client = client is None
     bie = client or BIEClient()
     try:
-        wide = bie.fetch_many(catalog.tolist(), historic=historic)
+        wide = bie.fetch_many(catalog.tolist(), historic=historic, progress_cb=progress_cb)
     finally:
         if owns_client:
             bie.close()
