@@ -48,9 +48,8 @@ def resolve_quincenal_ids(
 def _try_candidates(client: BIEClient, ids: list[str]) -> tuple[str, str] | None:
     """Devuelve ``(id, último TIME_PERIOD)`` del primer ID que responda quincenal."""
     for ind in ids:
-        url = client._url(ind, historic=False)
         try:
-            payload = client._get(url)
+            payload = client.probe(ind, historic=False)
         except BIEError as exc:
             logger.debug("Candidato %s falló: %s", ind, exc)
             continue

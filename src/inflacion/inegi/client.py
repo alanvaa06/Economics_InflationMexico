@@ -158,6 +158,16 @@ class BIEClient:
             )
         return pd.concat(frames, axis=1).sort_index()
 
+    def probe(self, indicator: str | int, *, historic: bool = False) -> dict[str, Any]:
+        """Devuelve el payload JSON crudo del BIE para inspección.
+
+        A diferencia de :meth:`fetch_series`, no parsea observations a
+        DataFrame — el resolver de IDs quincenales necesita el JSON crudo
+        para clasificar por ``TIME_PERIOD``.
+        """
+        url = self._url(str(indicator), historic=historic)
+        return self._get(url)
+
     def health_check(self) -> None:
         """Verifica que el token sea aceptado por INEGI sondeando un ID maestro.
 

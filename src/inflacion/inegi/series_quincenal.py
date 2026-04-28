@@ -12,11 +12,14 @@ por defecto: el resolver lo poblará al primer refresh).
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
 import pandas as pd
 
 from inflacion.config import settings
+
+logger = logging.getLogger(__name__)
 
 # Candidatos publicados/conocidos para cada concepto quincenal de cabecera.
 # Cada lista se prueba en orden hasta encontrar el primero que responda 200 +
@@ -66,5 +69,6 @@ def _read_sidecar(path: Path | None = None) -> dict[str, str]:
         data = json.loads(target.read_text(encoding="utf-8"))
         ids = data.get("ids", {})
         return {name: meta["id"] for name, meta in ids.items() if meta.get("id")}
-    except (json.JSONDecodeError, KeyError, TypeError):
+    except (json.JSONDecodeError, KeyError, TypeError) as exc:
+        logger.warning("Sidecar quincenal corrupto en %s: %s — re-resolverá", target, exc)
         return {}
