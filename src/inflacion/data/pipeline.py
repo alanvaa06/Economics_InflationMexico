@@ -52,23 +52,28 @@ def refresh_inpc(
 
 
 def load_local_inpc(path: Path | None = None) -> pd.DataFrame:
-    """Carga el INPC ya descargado (parquet preferido, xlsx como fallback)."""
-    candidates = (
-        [Path(path)]
-        if path
-        else [
-            settings.data_dir / "RelevantInflation.parquet",
-            settings.data_dir.parent / "RelevantInflation.xlsx",
-        ]
-    )
-    for c in candidates:
-        if c.exists():
-            df = pd.read_parquet(c) if c.suffix == ".parquet" else pd.read_excel(c, index_col=0)
-            df.index = pd.to_datetime(df.index)
-            return df.sort_index()
-    raise FileNotFoundError(
-        "No se encontró un archivo INPC local. Ejecuta `inflacion refresh` primero."
-    )
+    """Carga el INPC local (parquet) o lo descarga de INEGI si falta."""
+    target = Path(path) if path else settings.data_dir / "RelevantInflation.parquet"
+    if target.exists():
+        df = pd.read_parquet(target)
+        df.index = pd.to_datetime(df.index)
+        return df.sort_index()
+
+    try:
+        settings.require_token()
+    except RuntimeError as exc:
+        raise FileNotFoundError(
+            "No se encontró cache local del INPC y falta `INEGI_API_TOKEN`. "
+            "Configura `.env` o ejecuta `inflacion refresh` en un entorno con token."
+        ) from exc
+
+    logger.info("INPC local no encontrado; descargando desde INEGI BIE a %s", target)
+    refresh_inpc(historic=True, out_path=target)
+    if target.exists():
+        df = pd.read_parquet(target)
+        df.index = pd.to_datetime(df.index)
+        return df.sort_index()
+    raise FileNotFoundError("No se pudo generar `RelevantInflation.parquet` desde INEGI.")
 
 
 def refresh_inpc_quincenal(
@@ -123,21 +128,25 @@ def refresh_inpc_quincenal(
 
 
 def load_local_inpc_quincenal(path: Path | None = None) -> pd.DataFrame:
-    """Carga el INPC quincenal ya descargado (parquet preferido)."""
-    candidates = (
-        [Path(path)]
-        if path
-        else [
-            settings.data_dir / "RelevantInflation_Q.parquet",
-            settings.data_dir.parent / "RelevantInflation_Q.xlsx",
-        ]
-    )
-    for c in candidates:
-        if c.exists():
-            df = pd.read_parquet(c) if c.suffix == ".parquet" else pd.read_excel(c, index_col=0)
-            df.index = pd.to_datetime(df.index)
-            return df.sort_index()
-    raise FileNotFoundError(
-        "No se encontró un archivo INPC quincenal local. "
-        "Ejecuta `inflacion refresh --frequency quincenal` primero."
-    )
+    """Carga el INPC quincenal local (parquet) o lo descarga de INEGI si falta."""
+    target = Path(path) if path else settings.data_dir / "RelevantInflation_Q.parquet"
+    if target.exists():
+        df = pd.read_parquet(target)
+        df.index = pd.to_datetime(df.index)
+        return df.sort_index()
+
+    try:
+        settings.require_token()
+    except RuntimeError as exc:
+        raise FileNotFoundError(
+            "No se encontró cache local quincenal y falta `INEGI_API_TOKEN`. "
+            "Configura `.env` o ejecuta `inflacion refresh --frequency quincenal`."
+        ) from exc
+
+    logger.info("INPC quincenal local no encontrado; descargando desde INEGI BIE a %s", target)
+    refresh_inpc_quincenal(historic=True, out_path=target)
+    if target.exists():
+        df = pd.read_parquet(target)
+        df.index = pd.to_datetime(df.index)
+        return df.sort_index()
+    raise FileNotFoundError("No se pudo generar `RelevantInflation_Q.parquet` desde INEGI.")

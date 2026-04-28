@@ -53,6 +53,7 @@ Thumbs.db
 data/raw/
 data/interim/
 *.parquet
+.cache/
 
 # Streamlit
 .streamlit/secrets.toml

@@ -48,7 +48,7 @@ cp .env.example .env
 # editar .env y poner tu INEGI_API_TOKEN
 # obtenerlo en: https://www.inegi.org.mx/servicios/api_indicadores.html
 
-# Descargar datos del INEGI (opcional; el repo trae un snapshot 1969-2024-04)
+# Descargar/generar cache local desde INEGI
 inflacion refresh                       # mensual (471 series)
 inflacion refresh --frequency quincenal # quincenal (~10 agregados de cabecera)
 
@@ -66,10 +66,10 @@ src/inflacion/
 ├── config.py            # carga INEGI_API_TOKEN desde .env (pydantic-settings)
 ├── inegi/
 │   ├── client.py            # cliente httpx + tenacity + redacción de tokens
-│   ├── series.py            # catálogo mensual (471 series, XLSX)
+│   ├── series.py            # catálogo mensual (471 series, sin dependencia XLSX)
 │   └── series_quincenal.py  # catálogo quincenal (~10 IDs cabecera)
 ├── data/
-│   ├── ponderadores.py      # ponderadores INPC (rebase a 100 por rubro)
+│   ├── ponderadores.py      # ponderadores oficiales INEGI + cache local normalizado
 │   └── pipeline.py          # refresh_inpc / refresh_inpc_quincenal
 ├── analytics/
 │   ├── contributions.py     # MoM / YoY / incidencias
@@ -108,12 +108,12 @@ Pruebas marcadas como `@pytest.mark.live` consultan el BIE real (requieren
 
 ## Datos
 
-- `SeriesInflation_ids.xlsx`: catálogo de IDs del BIE (471 series).
-- `ponderadores.xlsx` (hoja `ObjetoGasto`): pesos del INPC y marcas `X`
-  para cada rubro/agregado. INEGI actualizó la canasta y ponderadores en
-  2024 (base 2ª quincena de julio 2018 = 100); mantenlos sincronizados.
-- `RelevantInflation.xlsx` / `FullInflation.xlsx`: snapshots históricos
-  generados con `inflacion refresh`.
+- **Fuente primaria mensual/quincenal**: API BIE de INEGI (`inflacion refresh`).
+- **Fuente primaria de canasta/ponderadores**: RNM de INEGI
+  (`https://www.inegi.org.mx/rnm/index.php/catalog/1015/download/32034`).
+- **Cache local generado**: `data/RelevantInflation.parquet`,
+  `data/RelevantInflation_Q.parquet` y `data/ponderadores_inpc_official.parquet`.
+- Los Excel históricos del repositorio ya no son requeridos para ejecutar la app.
 
 ### Frecuencia quincenal
 

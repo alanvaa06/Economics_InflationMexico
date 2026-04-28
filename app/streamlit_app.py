@@ -5,9 +5,8 @@ Ejecutar localmente::
     streamlit run app/streamlit_app.py
 
 Requiere:
-- ``data/RelevantInflation.parquet`` o ``RelevantInflation.xlsx`` en la raíz.
-- ``ponderadores.xlsx`` en la raíz.
-- ``INEGI_API_TOKEN`` en ``.env`` solo si se usa el botón "Actualizar datos".
+- ``INEGI_API_TOKEN`` en ``.env`` para descargar/actualizar desde INEGI.
+- Cache local generado en ``data/`` (parquet) tras la primera descarga.
 """
 from __future__ import annotations
 
@@ -69,8 +68,8 @@ try:
     inpc, ponderadores = _load_monthly()
 except FileNotFoundError as exc:
     st.error(
-        "No se encontró el INPC local. Ejecuta `inflacion refresh` o usa el botón "
-        "**Actualizar (mensual)** en la barra lateral (requiere `.env` con `INEGI_API_TOKEN`)."
+        "No se pudo cargar el INPC mensual desde cache local ni descargarlo de INEGI. "
+        "Verifica `.env` con `INEGI_API_TOKEN` y vuelve a intentar."
     )
     st.exception(exc)
     st.stop()
@@ -129,29 +128,30 @@ with st.sidebar:
         st.caption(
             f"Última observación local ({freq.lower()}): **{inpc_active.index.max():%Y-%m-%d}**"
         )
+    st.caption("Fuente: **INEGI (BIE/RNM)** | cache local generado por la app.")
 
     col_b1, col_b2 = st.columns(2)
-    if col_b1.button("Actualizar (mensual)"):
+    if col_b1.button("Descargar desde INEGI (mensual)"):
         try:
             settings.require_token()
         except RuntimeError as exc:
             st.error(str(exc))
         else:
-            with st.status("Descargando mensual…"):
+            with st.status("Descargando mensual desde INEGI…"):
                 refresh_inpc(
                     historic=True,
                     out_path=settings.data_dir / "RelevantInflation.parquet",
                 )
             st.cache_data.clear()
             st.rerun()
-    if col_b2.button("Actualizar (quincenal)"):
+    if col_b2.button("Descargar desde INEGI (quincenal)"):
         try:
             settings.require_token()
         except RuntimeError as exc:
             st.error(str(exc))
         else:
             try:
-                with st.status("Descargando quincenal…"):
+                with st.status("Descargando quincenal desde INEGI…"):
                     refresh_inpc_quincenal(
                         historic=True,
                         out_path=settings.data_dir / "RelevantInflation_Q.parquet",
