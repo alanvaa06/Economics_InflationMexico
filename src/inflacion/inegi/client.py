@@ -48,6 +48,28 @@ def _redact(msg: str) -> str:
     return _TOKEN_RE.sub("REDACTED", msg)
 
 
+def classify_period(payload: dict[str, Any]) -> str:
+    """Clasifica un payload BIE por su primer ``TIME_PERIOD``.
+
+    Retorna ``"mensual"`` (formato ``YYYY/MM``), ``"quincenal"``
+    (``YYYY/MM/Q1|Q2`` o ``YYYY/MM/1|2``), o ``"desconocido"``.
+    Tolera payloads malformados devolviendo ``"desconocido"``.
+    """
+    try:
+        observations = payload["Series"][0]["OBSERVATIONS"]
+    except (KeyError, IndexError, TypeError):
+        return "desconocido"
+    if not observations:
+        return "desconocido"
+    tp = observations[0].get("TIME_PERIOD", "")
+    parts = tp.split("/") if tp else []
+    if len(parts) == 2:
+        return "mensual"
+    if len(parts) == 3 and _QUINCENA_RE.match(parts[2].strip()):
+        return "quincenal"
+    return "desconocido"
+
+
 class BIEClient:
     """Cliente síncrono mínimo del BIE (formato JSON v2.0).
 
