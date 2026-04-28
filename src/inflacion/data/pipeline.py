@@ -52,12 +52,16 @@ def refresh_inpc(
 
 
 def load_local_inpc(path: Path | None = None) -> pd.DataFrame:
-    """Carga el INPC local (parquet) o lo descarga de INEGI si falta."""
+    """Carga el INPC local (parquet) o lo descarga de INEGI si falta o está vacío."""
     target = Path(path) if path else settings.data_dir / "RelevantInflation.parquet"
     if target.exists():
         df = pd.read_parquet(target)
-        df.index = pd.to_datetime(df.index)
-        return df.sort_index()
+        if df.empty or df.shape[1] == 0:
+            logger.warning("Parquet vacío en %s — descartando y re-descargando.", target)
+            target.unlink()
+        else:
+            df.index = pd.to_datetime(df.index)
+            return df.sort_index()
 
     try:
         settings.require_token()
@@ -128,12 +132,16 @@ def refresh_inpc_quincenal(
 
 
 def load_local_inpc_quincenal(path: Path | None = None) -> pd.DataFrame:
-    """Carga el INPC quincenal local (parquet) o lo descarga de INEGI si falta."""
+    """Carga el INPC quincenal local (parquet) o lo descarga de INEGI si falta o está vacío."""
     target = Path(path) if path else settings.data_dir / "RelevantInflation_Q.parquet"
     if target.exists():
         df = pd.read_parquet(target)
-        df.index = pd.to_datetime(df.index)
-        return df.sort_index()
+        if df.empty or df.shape[1] == 0:
+            logger.warning("Parquet quincenal vacío en %s — descartando.", target)
+            target.unlink()
+        else:
+            df.index = pd.to_datetime(df.index)
+            return df.sort_index()
 
     try:
         settings.require_token()
