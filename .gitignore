@@ -55,6 +55,9 @@ data/interim/
 *.parquet
 .cache/
 
+# Sidecar de IDs quincenales resueltos (regenerable)
+data/quincenal_ids_resolved.json
+
 # Streamlit
 .streamlit/secrets.toml
 

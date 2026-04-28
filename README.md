@@ -90,7 +90,7 @@ notebooks/               # (opcional) cuadernos de exploración
 ## Pruebas
 
 ```bash
-python3 -m pytest -q     # 40 pruebas
+.venv/Scripts/python.exe -m pytest -q   # 79 pruebas
 python3 -m ruff check src tests app
 ```
 
@@ -117,19 +117,19 @@ Pruebas marcadas como `@pytest.mark.live` consultan el BIE real (requieren
 
 ### Frecuencia quincenal
 
-INEGI publica el INPC cada 10 y 25 de mes. El catálogo en
-`src/inflacion/inegi/series_quincenal.py` viene con **placeholders** para
-los IDs del BIE. Para activarlo:
+INEGI publica el INPC cada 10 y 25 de mes. La app **descubre los IDs reales del
+BIE automáticamente** la primera vez que pulsas *Descargar (quincenal)*:
 
-1. Abre el [Banco de Indicadores](https://www.inegi.org.mx/app/indicadores/)
-   filtrando por frecuencia *Quincenal*.
-2. Copia los IDs numéricos de los agregados (`IndiceGeneral`, `Subyacente`,
-   `NoSubyacente`, etc.) en `QUINCENAL_HEADLINE_IDS`.
-3. Corre `inflacion refresh --frequency quincenal`. El cliente acepta los
-   formatos ``YYYY/MM/Q1`` y ``YYYY/MM/Q2`` que devuelve el BIE.
+1. La app sondea cada candidato listado en
+   `src/inflacion/inegi/series_quincenal.py::QUINCENAL_HEADLINE_CANDIDATES`.
+2. Clasifica cada respuesta por formato de `TIME_PERIOD` (`YYYY/MM` = mensual,
+   `YYYY/MM/Q1|Q2` = quincenal).
+3. Persiste los resueltos en `data/quincenal_ids_resolved.json` (sidecar
+   regenerable, ignorado por git).
+4. Descarga el histórico de los IDs resueltos.
 
-El parquet resultante (`data/RelevantInflation_Q.parquet`) lo consume el
-dashboard cuando se elige *Quincenal* en la barra lateral.
+Si conoces los IDs reales y prefieres fijarlos manualmente, agrégalos a
+`QUINCENAL_HEADLINE_IDS` en el mismo archivo — el resolver los respeta.
 
 ## Licencia
 
