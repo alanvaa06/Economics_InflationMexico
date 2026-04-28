@@ -78,3 +78,42 @@ def test_quincenal_candidates_has_expected_keys():
     for name, ids in QUINCENAL_HEADLINE_CANDIDATES.items():
         assert isinstance(ids, list) and ids, f"{name} sin candidatos"
         assert all(isinstance(i, str) and i for i in ids), f"{name} con candidatos vacíos"
+
+
+@respx.mock
+def test_refresh_quincenal_runs_resolver_when_catalog_empty(monkeypatch, tmp_path):
+    """Si load_quincenal_catalog devuelve Series vacía, refresh corre el resolver."""
+    import pandas as pd
+
+    from inflacion.data.pipeline import refresh_inpc_quincenal_with_discovery
+    from inflacion.inegi.client import BIEClient
+
+    monkeypatch.setattr(
+        "inflacion.data.pipeline.load_quincenal_catalog",
+        lambda: pd.Series(dtype=object, name="Serie"),
+    )
+    monkeypatch.setattr(
+        "inflacion.inegi.series_quincenal.QUINCENAL_HEADLINE_CANDIDATES",
+        {"IndiceGeneral": ["XYZ"]},
+    )
+
+    # XYZ responde quincenal
+    respx.get(f"{BASE}/INDICATOR/XYZ/es/0700/false/BIE/2.0/{TOKEN}?type=json").mock(
+        return_value=httpx.Response(200, json=_q_payload())
+    )
+    # Y luego XYZ se descarga histórico
+    respx.get(f"{BASE}/INDICATOR/XYZ/es/0700/true/BIE/2.0/{TOKEN}?type=json").mock(
+        return_value=httpx.Response(200, json=_q_payload())
+    )
+
+    out = tmp_path / "Q.parquet"
+    sidecar = tmp_path / "ids.json"
+    df = refresh_inpc_quincenal_with_discovery(
+        client=BIEClient(token=TOKEN),
+        out_path=out,
+        sidecar_path=sidecar,
+        historic=True,
+    )
+    assert "IndiceGeneral" in df.columns
+    assert sidecar.exists()
+    assert out.exists()

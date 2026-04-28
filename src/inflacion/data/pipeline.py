@@ -138,6 +138,69 @@ def refresh_inpc_quincenal(
     return wide
 
 
+def refresh_inpc_quincenal_with_discovery(
+    *,
+    client: BIEClient | None = None,
+    out_path: Path | None = None,
+    sidecar_path: Path | None = None,
+    historic: bool = True,
+    discovery_progress_cb: Callable[[int, int, str], None] | None = None,
+    fetch_progress_cb: Callable[[int, int, str], None] | None = None,
+) -> pd.DataFrame:
+    """Resuelve IDs quincenales (si hace falta) y descarga el histórico.
+
+    Si ``load_quincenal_catalog`` ya devuelve un mapping no-vacío (sidecar previo
+    o overrides manuales), salta el resolver. Si no, sondea
+    ``QUINCENAL_HEADLINE_CANDIDATES`` y persiste el sidecar antes del fetch.
+    """
+    from inflacion.data.quincenal_resolver import resolve_quincenal_ids
+    from inflacion.inegi.series_quincenal import (
+        QUINCENAL_HEADLINE_CANDIDATES,
+        SIDECAR_PATH,
+    )
+
+    sidecar = sidecar_path or SIDECAR_PATH
+    catalog = load_quincenal_catalog()
+    owns_client = client is None
+    bie = client or BIEClient()
+    try:
+        if catalog.empty:
+            resolved = resolve_quincenal_ids(
+                bie,
+                QUINCENAL_HEADLINE_CANDIDATES,
+                sidecar_path=sidecar,
+                progress_cb=discovery_progress_cb,
+            )
+            if not resolved:
+                raise RuntimeError(
+                    "Ningún candidato quincenal respondió. Revisa token o agrega IDs en "
+                    "QUINCENAL_HEADLINE_IDS / QUINCENAL_HEADLINE_CANDIDATES."
+                )
+            catalog = pd.Series(resolved, name="Serie")
+
+        wide = bie.fetch_many(
+            catalog.tolist(), historic=historic, progress_cb=fetch_progress_cb
+        )
+    finally:
+        if owns_client:
+            bie.close()
+
+    id_to_name = {str(v): str(k) for k, v in catalog.items()}
+    wide = wide.rename(columns=id_to_name)
+
+    if out_path:
+        target = Path(out_path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if target.suffix.lower() == ".parquet":
+            wide.to_parquet(target)
+        else:
+            wide.to_excel(target)
+        logger.info(
+            "INPC quincenal guardado en %s (%d filas, %d columnas)", target, *wide.shape
+        )
+    return wide
+
+
 def load_local_inpc_quincenal(path: Path | None = None) -> pd.DataFrame:
     """Carga el INPC quincenal local (parquet) o lo descarga de INEGI si falta o está vacío."""
     target = Path(path) if path else settings.data_dir / "RelevantInflation_Q.parquet"
