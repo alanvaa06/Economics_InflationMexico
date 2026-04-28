@@ -11,7 +11,7 @@ from __future__ import annotations
 import calendar
 import logging
 import re
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from datetime import date
 from typing import Any
 
@@ -126,18 +126,36 @@ class BIEClient:
         payload = self._get(url)
         return _parse_observations(payload)
 
-    def fetch_many(self, indicators: Iterable[str | int], *, historic: bool = False) -> pd.DataFrame:
-        """Une varias series por columna (clave = id como string)."""
+    def fetch_many(
+        self,
+        indicators: Iterable[str | int],
+        *,
+        historic: bool = False,
+        progress_cb: Callable[[int, int, str], None] | None = None,
+    ) -> pd.DataFrame:
+        """Une varias series por columna (clave = id como string).
+
+        Args:
+            indicators: IDs BIE a descargar.
+            historic: ``True`` trae serie completa, ``False`` reciente.
+            progress_cb: opcional. Se invoca tras procesar cada serie con
+                ``(done, total, name)``. ``done`` empieza en 1, ``name`` es el ID.
+        """
+        ids = [str(ind) for ind in indicators]
+        total = len(ids)
         frames: list[pd.DataFrame] = []
-        for ind in indicators:
+        for index, ind in enumerate(ids, start=1):
             try:
-                df = self.fetch_series(ind, historic=historic).rename(columns={"valor": str(ind)})
+                df = self.fetch_series(ind, historic=historic).rename(columns={"valor": ind})
+                frames.append(df)
             except BIEError as exc:
                 logger.warning("No se pudo descargar %s: %s", ind, _redact(str(exc)))
-                continue
-            frames.append(df)
+            if progress_cb is not None:
+                progress_cb(index, total, ind)
         if not frames:
-            return pd.DataFrame()
+            raise BIEError(
+                "BIE: ninguna serie respondió OK. Verifica el token o el catálogo."
+            )
         return pd.concat(frames, axis=1).sort_index()
 
     def health_check(self) -> None:

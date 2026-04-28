@@ -96,3 +96,49 @@ def test_redact_uuid_in_logs():
     redacted = _redact(msg)
     assert fake_uuid not in redacted
     assert "REDACTED" in redacted
+
+
+@respx.mock
+def test_fetch_many_raises_when_all_series_fail():
+    """Si todas las series fallan, fetch_many debe levantar (no devolver DF vacío)."""
+    url1 = f"{BASE}/INDICATOR/1/es/0700/false/BIE/2.0/{TOKEN}?type=json"
+    url2 = f"{BASE}/INDICATOR/2/es/0700/false/BIE/2.0/{TOKEN}?type=json"
+    respx.get(url1).mock(return_value=httpx.Response(403, text="x"))
+    respx.get(url2).mock(return_value=httpx.Response(403, text="x"))
+
+    with BIEClient(token=TOKEN) as client, pytest.raises(BIEError, match="ninguna serie"):
+        client.fetch_many([1, 2])
+
+
+@respx.mock
+def test_fetch_many_invokes_progress_cb_in_order():
+    """progress_cb se llama tras cada serie con (done, total, name)."""
+    url1 = f"{BASE}/INDICATOR/1/es/0700/false/BIE/2.0/{TOKEN}?type=json"
+    url2 = f"{BASE}/INDICATOR/2/es/0700/false/BIE/2.0/{TOKEN}?type=json"
+    respx.get(url1).mock(return_value=httpx.Response(200, json=_ok_payload()))
+    respx.get(url2).mock(return_value=httpx.Response(200, json=_ok_payload()))
+
+    calls: list[tuple[int, int, str]] = []
+
+    def cb(done: int, total: int, name: str) -> None:
+        calls.append((done, total, name))
+
+    with BIEClient(token=TOKEN) as client:
+        client.fetch_many([1, 2], progress_cb=cb)
+
+    assert calls == [(1, 2, "1"), (2, 2, "2")]
+
+
+@respx.mock
+def test_fetch_many_progress_cb_called_even_on_failures():
+    """progress_cb se llama también cuando una serie falla individualmente."""
+    url1 = f"{BASE}/INDICATOR/1/es/0700/false/BIE/2.0/{TOKEN}?type=json"
+    url2 = f"{BASE}/INDICATOR/2/es/0700/false/BIE/2.0/{TOKEN}?type=json"
+    respx.get(url1).mock(return_value=httpx.Response(200, json=_ok_payload()))
+    respx.get(url2).mock(return_value=httpx.Response(403, text="bad"))
+
+    calls: list[int] = []
+    with BIEClient(token=TOKEN) as client:
+        client.fetch_many([1, 2], progress_cb=lambda d, t, n: calls.append(d))
+
+    assert calls == [1, 2]
