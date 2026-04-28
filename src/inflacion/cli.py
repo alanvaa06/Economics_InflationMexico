@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from inflacion.config import settings
-from inflacion.data.pipeline import refresh_inpc, refresh_inpc_quincenal
+from inflacion.data.pipeline import refresh_inpc, refresh_inpc_quincenal_with_discovery
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -46,7 +46,9 @@ def main(argv: list[str] | None = None) -> int:
         settings.require_token()
         if args.frequency == "quincenal":
             out = args.output or settings.data_dir / "RelevantInflation_Q.parquet"
-            refresh_inpc_quincenal(historic=not args.recent_only, out_path=out)
+            refresh_inpc_quincenal_with_discovery(
+                historic=not args.recent_only, out_path=out
+            )
         else:
             out = args.output or settings.data_dir / "RelevantInflation.parquet"
             refresh_inpc(historic=not args.recent_only, out_path=out)
