@@ -7,7 +7,6 @@ import respx
 
 from inflacion.data import pipeline
 from inflacion.inegi.client import BIEClient
-from inflacion.inegi.series_quincenal import QUINCENAL_HEADLINE_IDS
 
 BASE = "https://www.inegi.org.mx/app/api/indicadores/desarrolladores/jsonxml"
 TOKEN = "test-token-0000"
@@ -63,8 +62,10 @@ def test_refresh_quincenal_partial_success(monkeypatch, tmp_path):
     assert out.exists()
 
 
-def test_quincenal_catalog_has_expected_keys():
-    """Conserva los nombres canónicos para que el dashboard los reconozca."""
+def test_quincenal_candidates_has_expected_keys():
+    """Los nombres canónicos de cabecera están en CANDIDATES (los IDs concretos los resuelve el resolver)."""
+    from inflacion.inegi.series_quincenal import QUINCENAL_HEADLINE_CANDIDATES
+
     expected = {
         "IndiceGeneral",
         "Subyacente",
@@ -72,4 +73,8 @@ def test_quincenal_catalog_has_expected_keys():
         "Mercancías",
         "Servicios",
     }
-    assert expected.issubset(QUINCENAL_HEADLINE_IDS.keys())
+    assert expected.issubset(QUINCENAL_HEADLINE_CANDIDATES.keys())
+    # Cada candidato debe ser una lista no-vacía de strings
+    for name, ids in QUINCENAL_HEADLINE_CANDIDATES.items():
+        assert isinstance(ids, list) and ids, f"{name} sin candidatos"
+        assert all(isinstance(i, str) and i for i in ids), f"{name} con candidatos vacíos"
