@@ -79,6 +79,8 @@ class BIEClient:
         df = client.fetch_series("583766")  # IndiceGeneral
     """
 
+    HEALTH_PROBE_ID = "583766"  # IndiceGeneral mensual (INPC base 2018)
+
     def __init__(
         self,
         token: str | None = None,
@@ -132,6 +134,31 @@ class BIEClient:
             return pd.DataFrame()
         return pd.concat(frames, axis=1).sort_index()
 
+    def health_check(self) -> None:
+        """Verifica que el token sea aceptado por INEGI sondeando un ID maestro.
+
+        Raises:
+            MissingTokenError: el token es sintácticamente válido pero INEGI lo rechaza
+                (HTTP 400 con cuerpo conteniendo "No se encontraron resultados").
+            BIEError: cualquier otra falla (5xx, 400 con cuerpo distinto, etc.).
+        """
+        url = self._url(self.HEALTH_PROBE_ID, historic=False)
+        try:
+            response = self._client.get(url)
+        except httpx.HTTPError as exc:
+            raise BIEError(f"Error de red en health_check: {_redact(str(exc))}") from None
+        if response.status_code == 200:
+            return
+        body = response.text
+        if response.status_code == 400 and "No se encontraron resultados" in body:
+            raise MissingTokenError(
+                "INEGI rechazó el token (HTTP 400). Renueva en "
+                "https://www.inegi.org.mx/servicios/api_indicadores.html y actualiza .env."
+            )
+        raise BIEError(
+            f"health_check falló: HTTP {response.status_code} body={body[:200]!r}"
+        )
+
     # --- internos ---
     def _url(self, indicator: str, *, historic: bool) -> str:
         flag = "true" if historic else "false"
@@ -157,7 +184,9 @@ class BIEClient:
         if response.status_code >= 500:
             response.raise_for_status()  # → activa retry
         if response.status_code != 200:
-            raise BIEError(f"Respuesta inesperada del BIE: HTTP {response.status_code}")
+            raise BIEError(
+                f"Respuesta inesperada del BIE: HTTP {response.status_code} body={response.text[:200]!r}"
+            )
         try:
             return response.json()  # type: ignore[no-any-return]
         except ValueError as exc:
